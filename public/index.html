@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BZ Energy Tracker</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f6f8;color:#222}
+  header{background:#0b6b3a;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  header b{font-size:18px}
+  header button{background:transparent;color:#fff;border:1px solid #fff;border-radius:6px;padding:6px 10px}
+  nav{display:flex;background:#dfe6e0;overflow-x:auto}
+  nav button{flex:none;padding:12px 14px;border:0;background:transparent;font-size:15px;white-space:nowrap}
+  nav button.on{background:#fff;font-weight:bold;border-bottom:3px solid #0b6b3a}
+  .wrap{padding:14px;max-width:820px;margin:auto}
+  label.l{display:block;margin:12px 0 4px;font-weight:bold;font-size:14px}
+  input,select,textarea{width:100%;padding:11px;font-size:16px;border:1px solid #bbb;border-radius:6px;background:#fff;font-family:inherit}
+  .row{display:flex;gap:8px;align-items:center}
+  .shift button{flex:1;padding:12px;font-size:16px;border:2px solid #0b6b3a;background:#fff;border-radius:6px}
+  .shift button.on{background:#0b6b3a;color:#fff}
+  .chk{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:10px;margin:6px 0;font-weight:normal}
+  .chk input{width:22px;height:22px;flex:none}
+  .go{width:100%;margin-top:16px;padding:14px;font-size:17px;background:#0b6b3a;color:#fff;border:0;border-radius:6px}
+  .sec{background:#fff;color:#0b6b3a;border:2px solid #0b6b3a;border-radius:6px;padding:9px 14px;font-size:15px}
+  .small{padding:5px 10px;font-size:13px}
+  .danger{color:#a00;border-color:#a00}
+  .msg{margin-top:12px;padding:10px;border-radius:6px;font-weight:bold}
+  .ok{background:#d9f2e0;color:#0b6b3a}.bad{background:#fde0e0;color:#a00}
+  table{width:100%;border-collapse:collapse;background:#fff;margin-top:10px}
+  th,td{border:1px solid #ddd;padding:8px;font-size:14px;text-align:left;vertical-align:top}
+  td.n,th.n{text-align:right}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0}
+  .card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px}
+  .card small{color:#666}.card .v{font-size:22px;font-weight:bold;margin-top:4px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;margin:2px 6px 2px 0;background:#eee}
+  .done{background:#d9f2e0}.todo{background:#fff1cc}.late{background:#fde0e0;color:#a00}.prog{background:#dbe8ff}
+  .item{background:#fff;border:1px solid #ddd;border-left:5px solid #bbb;border-radius:6px;padding:10px;margin:8px 0;font-size:14px}
+  .item.s-Done,.item.s-Fixed,.item.s-Approved,.item.closed{border-left-color:#0b6b3a}
+  .item.s-In\ progress,.item.s-Action\ in\ progress{border-left-color:#2f6fdc}
+  .item.late,.item.issue{border-left-color:#d98c00}
+  .item.late{border-left-color:#c00}
+  .item h4{margin:0 0 4px;font-size:15px}
+  .meta{font-size:12px;color:#666;margin:2px 0}
+  .bar{height:10px;background:#e3e3e3;border-radius:5px;overflow:hidden;margin:4px 0 10px}
+  .bar i{display:block;height:100%;background:#0b6b3a}
+  .note{font-size:13px;color:#555}
+  h3{margin:18px 0 6px}
+  #login{max-width:360px;margin:60px auto;padding:20px;background:#fff;border-radius:10px;text-align:center}
+  .hide{display:none}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 10px;z-index:10}
+  .modal{background:#fff;border-radius:10px;padding:16px;width:100%;max-width:520px}
+  .modal h3{margin-top:0}
+  .scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>BZ Energy Tracker</h2>
+  <p class="note">Enter your PIN</p>
+  <input id="pinIn" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">
+  <button class="go" onclick="doLogin()">Open</button>
+  <div id="loginMsg"></div>
+</div>
+
+<div id="app" class="hide">
+  <header><b>BZ Energy Tracker</b><span><span id="who" class="note" style="color:#cfe;margin-right:8px"></span><button onclick="logout()">Log out</button></span></header>
+  <nav id="nav"></nav>
+
+  <!-- ENTRY -->
+  <div class="wrap hide" id="v_entry">
+    <div id="status"></div>
+    <label class="l">Your name</label><select id="by"></select>
+    <label class="l">Date</label><input type="date" id="date">
+    <label class="l">Shift</label>
+    <div class="row shift"><button id="sOpen" onclick="setShift('Opening')">Opening</button><button id="sClose" onclick="setShift('Closing')">Closing</button></div>
+    <label class="l">Meter readings (units shown on the meter)</label><div id="meters"></div>
+    <label class="l">Member visits for this date (optional, from face-ID attendance)</label>
+    <input type="number" id="visits" min="0" step="1" inputmode="numeric" placeholder="For example 320">
+    <label class="l">Checklist</label><div id="items"></div>
+    <label class="l">Any problem found? (optional)</label>
+    <select id="area"><option>AC</option><option>Lights</option><option>Geyser / Steam / Sauna</option><option>Cardio / Equipment</option><option>Pump / Motor</option><option>Meter / Power</option><option>Other</option></select>
+    <textarea id="issue" rows="3" placeholder="Describe the problem" style="margin-top:6px"></textarea>
+    <button class="go" id="saveBtn" onclick="saveEntry(false)">Save entry</button>
+    <div id="msg"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="wrap hide" id="v_history">
+    <div class="row">
+      <div style="flex:1"><label class="l">From</label><input type="date" id="hFrom"></div>
+      <div style="flex:1"><label class="l">To</label><input type="date" id="hTo"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="sec" onclick="loadHistory()">Show</button>
+      <button class="sec admin" onclick="downloadCsv()">Download CSV</button>
+    </div>
+    <p class="note">Units (24h) = next morning's opening reading minus this day's opening reading, so a day shows units once the next morning's reading is saved. Staff can see up to 31 days.</p>
+    <div id="hTable" class="scroll"></div>
+    <h3 id="hMeterH" class="hide">Meter-wise readings</h3>
+    <div id="hMeters" class="scroll"></div>
+  </div>
+
+  <!-- PLAN -->
+  <div class="wrap hide" id="v_plan"><div id="planBox"></div></div>
+
+  <!-- AREAS -->
+  <div class="wrap hide" id="v_areas"><div id="areasBox"></div></div>
+
+  <!-- EQUIPMENT -->
+  <div class="wrap hide" id="v_equipment"><div id="equipBox"></div></div>
+
+  <!-- DASHBOARD -->
+  <div class="wrap hide" id="v_dash">
+    <p class="note" id="dPeriod"></p>
+    <div id="dCards" class="cards"></div>
+    <div class="card"><small>Units per day (24h), last 30 days. Dashed line = baseline.</small><div id="chart" style="font-size:12px"></div></div>
+    <h3>30/60/90-day plan progress</h3><div id="dPlan"></div>
+    <h3>Saving areas</h3><div id="dAreas"></div>
+    <h3>Issues reported (last 30 days)</h3><div id="dIssues"></div>
+  </div>
+
+  <!-- BILLS -->
+  <div class="wrap hide" id="v_bills"><div id="billsBox"></div></div>
+
+  <!-- APPROVALS -->
+  <div class="wrap hide" id="v_approvals"><div id="apprBox"></div></div>
+
+  <!-- SETTINGS -->
+  <div class="wrap hide" id="v_settings">
+    <h3 style="margin-top:0">Owners</h3>
+    <div class="row">
+      <div style="flex:1"><label class="l">Energy Owner (accountable)</label><select id="sOwner"></select></div>
+      <div style="flex:1"><label class="l">Backup (co-owner)</label><select id="sBackup"></select></div>
+    </div>
+    <div id="scoreBox"></div>
+    <h3>Plan and baseline</h3>
+    <div class="row">
+      <div style="flex:1"><label class="l">Plan start date</label><input type="date" id="sStart"></div>
+      <div style="flex:1"><label class="l">Baseline units per day</label><input id="sBase" type="number" step="any" inputmode="decimal"></div>
+    </div>
+    <h3>Lists (one item per line)</h3>
+    <label class="l">Meters</label><textarea id="sMeters" rows="4"></textarea>
+    <label class="l">Staff names</label><textarea id="sStaff" rows="4"></textarea>
+    <label class="l">Checklist items</label><textarea id="sItems" rows="8"></textarea>
+    <button class="go" onclick="saveSettings()">Save settings</button>
+    <div id="sMsg"></div>
+  </div>
+</div>
+
+<script>
+var PIN = '', ROLE = '', CFG = null, TODAY = '', shift = '';
+var CRITERIA = ['Knows AC, geysers, pumps and lighting circuits', 'Present across opening and closing hours', 'Keeps records reliably', 'Can instruct trainers and front desk politely but firmly'];
+var TABS = [['entry','Entry',0],['history','History',0],['plan','Plan',0],['areas','Saving areas',0],['equipment','Equipment',0],['dash','Dashboard',1],['bills','Bills',1],['approvals','CMD approvals',1],['settings','Settings',1]];
+function $(id){ return document.getElementById(id); }
+function sget(k){ try{ return localStorage.getItem(k) || ''; }catch(e){ return ''; } }
+function sset(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function sdel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
+async function api(path, opts){
+  opts = opts || {};
+  var h = { 'x-pin': PIN };
+  if (opts.body) h['Content-Type'] = 'application/json';
+  var r = await fetch(path, { method: opts.method || 'GET', headers: h, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  var data = {};
+  try { data = await r.json(); } catch(e) {}
+  if (!r.ok) { var err = new Error(data.error || ('Error ' + r.status)); err.status = r.status; err.code = data.code; throw err; }
+  return data;
+}
+function fmt(v){ return v === null || v === undefined ? '-' : (Math.round(v*100)/100).toString(); }
+function el(tag, text, cls){ var e = document.createElement(tag); if (text !== undefined && text !== null) e.textContent = text; if (cls) e.className = cls; return e; }
+function addRow(tb, cells, numFrom){
+  var tr = document.createElement('tr');
+  cells.forEach(function(c, i){ var td = el('td', c); if (numFrom !== undefined && i >= numFrom) td.className = 'n'; tr.appendChild(td); });
+  tb.appendChild(tr); return tr;
+}
+function tableOf(headers, numFrom){
+  var t = document.createElement('table'), th = document.createElement('thead'), tr = document.createElement('tr');
+  headers.forEach(function(h, i){ var c = el('th', h); if (numFrom !== undefined && i >= numFrom) c.className = 'n'; tr.appendChild(c); });
+  th.appendChild(tr); t.appendChild(th); t.appendChild(document.createElement('tbody'));
+  return t;
+}
+function showMsg(id, text, ok){ var m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'bad'); }
+function pct(a, b){ return b ? Math.round(100 * a / b) : 0; }
+function bar(p){ var b = el('div', undefined, 'bar'), i = document.createElement('i'); i.style.width = Math.min(100, p) + '%'; b.appendChild(i); return b; }
+function pill(text, cls){ return el('span', text, 'pill ' + (cls || '')); }
+function isAdmin(){ return ROLE === 'admin'; }
+
+/* ---------- popup form ---------- */
+// o = { title, fields:[{key,label,kind,options,disabled}], values, onSave(vals), onDelete() }
+function openForm(o){
+  var ov = el('div', undefined, 'overlay'), m = el('div', undefined, 'modal');
+  m.appendChild(el('h3', o.title));
+  var inputs = {};
+  o.fields.forEach(function(f){
+    m.appendChild(el('label', f.label, 'l'));
+    var i;
+    if (f.kind === 'select') {
+      i = document.createElement('select');
+      (f.options || []).forEach(function(op){ var x = el('option', op === '' ? '(none)' : op); x.value = op; i.appendChild(x); });
+    } else if (f.kind === 'textarea') { i = document.createElement('textarea'); i.rows = 3; }
+    else { i = document.createElement('input'); i.type = f.kind || 'text'; if (f.kind === 'number') { i.step = 'any'; i.inputMode = 'decimal'; } }
+    var v = o.values ? o.values[f.key] : '';
+    i.value = v === null || v === undefined ? '' : (f.kind === 'month' ? String(v).slice(0, 7) : v);
+    if (f.disabled) i.disabled = true;
+    inputs[f.key] = i; m.appendChild(i);
+  });
+  var msg = el('div'); m.appendChild(msg);
+  var r = el('div', undefined, 'row'); r.style.marginTop = '14px';
+  var save = el('button', 'Save', 'go'); save.style.marginTop = '0';
+  save.onclick = async function(){
+    var vals = {};
+    o.fields.forEach(function(f){ if (!f.disabled) vals[f.key] = inputs[f.key].value; });
+    save.disabled = true;
+    try { await o.onSave(vals); document.body.removeChild(ov); }
+    catch(e){ msg.textContent = e.message; msg.className = 'msg bad'; save.disabled = false; }
+  };
+  var cancel = el('button', 'Cancel', 'sec'); cancel.onclick = function(){ document.body.removeChild(ov); };
+  r.appendChild(save); r.appendChild(cancel);
+  if (o.onDelete) {
+    var del = el('button', 'Delete', 'sec danger');
+    del.onclick = async function(){ if (!confirm('Delete this record?')) return; try { await o.onDelete(); document.body.removeChild(ov); } catch(e){ msg.textContent = e.message; msg.className = 'msg bad'; } };
+    r.appendChild(del);
+  }
+  m.appendChild(r); ov.appendChild(m); document.body.appendChild(ov);
+}
+async function saveRecord(type, row){ return api('/api/records', { method: 'POST', body: { type: type, row: row } }); }
+async function deleteRecord(type, id){ return api('/api/records', { method: 'DELETE', body: { type: type, id: id } }); }
+
+/* ---------- login ---------- */
+async function doLogin(){
+  PIN = $('pinIn').value.trim();
+  $('loginMsg').textContent = ''; $('loginMsg').className = '';
+  try {
+    var d = await api('/api/config');
+    sset('bz_pin', PIN);
+    startApp(d);
+  } catch(e){
+    PIN = '';
+    $('loginMsg').className = 'msg bad';
+    $('loginMsg').textContent = e.status === 401 ? 'Wrong PIN.' : e.message;
+  }
+}
+function logout(){ sdel('bz_pin'); location.reload(); }
+$('pinIn').addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
+
+function startApp(d){
+  ROLE = d.role; CFG = d.config; TODAY = d.today;
+  $('login').classList.add('hide'); $('app').classList.remove('hide');
+  $('who').textContent = isAdmin() ? 'Admin' : 'Staff';
+  var nav = $('nav'); nav.innerHTML = '';
+  TABS.forEach(function(t){
+    if (t[2] && !isAdmin()) return;
+    var b = el('button', t[1]); b.id = 'n_' + t[0]; b.onclick = function(){ go(t[0]); }; nav.appendChild(b);
+  });
+  document.querySelectorAll('.admin').forEach(function(x){ x.classList.toggle('hide', !isAdmin()); });
+  buildEntryForm();
+  var h = new Date(TODAY + 'T00:00:00Z'); h.setUTCDate(h.getUTCDate() - 13);
+  $('hFrom').value = h.toISOString().slice(0,10); $('hTo').value = TODAY;
+  go('entry');
+}
+
+function go(v){
+  TABS.forEach(function(t){
+    var view = $('v_' + t[0]), nb = $('n_' + t[0]);
+    if (view) view.classList.toggle('hide', t[0] !== v);
+    if (nb) nb.className = t[0] === v ? 'on' : '';
+  });
+  var loaders = { entry: loadStatus, history: loadHistory, plan: loadPlan, areas: loadAreas, equipment: loadEquipment, dash: loadDash, bills: loadBills, approvals: loadApprovals, settings: fillSettings };
+  if (loaders[v]) loaders[v]();
+}
+function fail(boxId, e){ var b = $(boxId); b.innerHTML = ''; b.appendChild(el('div', e.message, 'msg bad')); }
+
+/* ---------- entry ---------- */
+function buildEntryForm(){
+  var by = $('by'); by.innerHTML = '';
+  var first = el('option', 'Choose...'); first.value = ''; by.appendChild(first);
+  CFG.staff.forEach(function(n){ var o = el('option', n); o.value = n; by.appendChild(o); });
+  by.value = sget('bz_by');
+  $('date').value = TODAY; $('date').max = TODAY;
+  var m = $('meters'); m.innerHTML = '';
+  CFG.meters.forEach(function(name){
+    var l = el('label', name); l.style.cssText = 'display:block;margin:8px 0 3px;font-size:14px';
+    var i = document.createElement('input'); i.type = 'number'; i.step = 'any'; i.inputMode = 'decimal'; i.setAttribute('data-meter', name);
+    m.appendChild(l); m.appendChild(i);
+  });
+  var it = $('items'); it.innerHTML = '';
+  CFG.items.forEach(function(name){
+    var row = el('label', undefined, 'chk');
+    var c = document.createElement('input'); c.type = 'checkbox'; c.setAttribute('data-item', name);
+    row.appendChild(c); row.appendChild(el('span', name)); it.appendChild(row);
+  });
+}
+function setShift(s){ shift = s; $('sOpen').className = s === 'Opening' ? 'on' : ''; $('sClose').className = s === 'Closing' ? 'on' : ''; }
+
+async function loadStatus(){
+  try {
+    var s = await api('/api/summary?from=' + TODAY + '&to=' + TODAY);
+    var box = $('status'); box.innerHTML = '';
+    ['Opening','Closing'].forEach(function(k){ box.appendChild(pill(k + ' today: ' + (s.status[k] ? 'done' : 'pending'), s.status[k] ? 'done' : 'todo')); });
+  } catch(e){}
+}
+
+async function saveEntry(force){
+  $('msg').textContent = ''; $('msg').className = '';
+  if (!shift) { showMsg('msg', 'Choose Opening or Closing.', false); return; }
+  var readings = {}, checklist = {};
+  document.querySelectorAll('[data-meter]').forEach(function(i){ readings[i.getAttribute('data-meter')] = i.value; });
+  document.querySelectorAll('[data-item]').forEach(function(c){ checklist[c.getAttribute('data-item')] = c.checked; });
+  var body = { by: $('by').value, date: $('date').value, shift: shift, readings: readings, checklist: checklist, visits: $('visits').value,
+               issueArea: $('area').value, issueText: $('issue').value, force: !!force };
+  $('saveBtn').disabled = true; $('saveBtn').textContent = 'Saving...';
+  try {
+    var r = await api('/api/entry', { method: 'POST', body: body });
+    showMsg('msg', r.message, true);
+    sset('bz_by', body.by);
+    document.querySelectorAll('[data-meter]').forEach(function(i){ i.value = ''; });
+    document.querySelectorAll('[data-item]').forEach(function(c){ c.checked = false; });
+    $('issue').value = ''; $('visits').value = '';
+    loadStatus();
+  } catch(e){
+    if (e.code === 'LOWER' && isAdmin() && confirm(e.message + '\n\nSave anyway (for example, meter was replaced)?')) {
+      $('saveBtn').disabled = false; $('saveBtn').textContent = 'Save entry';
+      return saveEntry(true);
+    }
+    showMsg('msg', e.message, false);
+  }
+  $('saveBtn').disabled = false; $('saveBtn').textContent = 'Save entry';
+}
+
+/* ---------- history ---------- */
+async function loadHistory(){
+  var box = $('hTable'); box.textContent = 'Loading...';
+  try {
+    var s = await api('/api/summary?from=' + $('hFrom').value + '&to=' + $('hTo').value);
+    $('hFrom').value = s.from; $('hTo').value = s.to;
+    box.innerHTML = '';
+    var t = tableOf(['Date','Units (24h)','Day units','Night units','Visits','Units per visit','Checklist'], 1);
+    s.days.forEach(function(d){ addRow(t.tBodies[0], [d.date, fmt(d.total), fmt(d.day), fmt(d.night), d.visits === null ? '-' : d.visits, fmt(d.perVisit), d.checklist === null ? '-' : d.checklist + '%'], 1); });
+    box.appendChild(t);
+    var mb = $('hMeters'); mb.innerHTML = '';
+    $('hMeterH').classList.toggle('hide', !s.rows.length);
+    if (s.rows.length) {
+      var t2 = tableOf(['Date','Meter','Opening','Closing'], 2);
+      s.rows.forEach(function(r){ addRow(t2.tBodies[0], [r.entry_date, r.meter, fmt(r.opening), fmt(r.closing)], 2); });
+      mb.appendChild(t2);
+    }
+  } catch(e){ box.textContent = e.message; }
+}
+async function downloadCsv(){
+  try {
+    var r = await fetch('/api/export?from=' + $('hFrom').value + '&to=' + $('hTo').value, { headers: { 'x-pin': PIN } });
+    if (!r.ok) throw new Error('Could not download');
+    var blob = await r.blob(), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'bz-energy-' + $('hFrom').value + '-to-' + $('hTo').value + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch(e){ alert(e.message); }
+}
+
+/* ---------- 30/60/90-day plan ---------- */
+async function loadPlan(){
+  var host = $('planBox'); host.textContent = 'Loading...';
+  try {
+    var d = await api('/api/records?type=plan'), rows = d.rows;
+    host.innerHTML = '';
+    var done = rows.filter(function(r){ return r.status === 'Done'; }).length;
+    var late = rows.filter(function(r){ return r.overdue; }).length;
+    host.appendChild(el('h3', 'Plan progress: ' + done + ' of ' + rows.length + ' tasks done' + (late ? ', ' + late + ' overdue' : '')));
+    host.appendChild(bar(pct(done, rows.length)));
+    if (!d.plan_start) host.appendChild(el('p', isAdmin() ? 'Set the plan start date in Settings to see due dates.' : 'Due dates will show once the admin sets the plan start date.', 'note'));
+    else host.appendChild(el('p', 'Plan started on ' + d.plan_start + '. Staff can update status and notes.', 'note'));
+    if (isAdmin()) {
+      var add = el('button', 'Add task', 'sec small');
+      add.onclick = function(){ editPlan({ phase: rows.length ? rows[rows.length-1].phase : '', status: 'Not started' }, true); };
+      host.appendChild(add);
+    }
+    var phases = [];
+    rows.forEach(function(r){ if (phases.indexOf(r.phase) < 0) phases.push(r.phase); });
+    phases.forEach(function(ph){
+      var list = rows.filter(function(r){ return r.phase === ph; });
+      var pd = list.filter(function(r){ return r.status === 'Done'; }).length;
+      host.appendChild(el('h3', ph + ' (' + pd + '/' + list.length + ')'));
+      host.appendChild(bar(pct(pd, list.length)));
+      list.forEach(function(r){
+        var c = el('div', undefined, 'item s-' + r.status + (r.overdue ? ' late' : ''));
+        c.appendChild(el('h4', r.title));
+        var meta = el('div', undefined, 'meta');
+        meta.appendChild(pill(r.status, r.status === 'Done' ? 'done' : r.status === 'In progress' ? 'prog' : 'todo'));
+        if (r.overdue) meta.appendChild(pill('Overdue', 'late'));
+        meta.appendChild(document.createTextNode((r.owner ? 'Owner: ' + r.owner + '  ' : '') + (r.due ? 'Due: ' + r.due + '  ' : '') + (r.area ? 'Area: ' + r.area : '') + (r.done_date ? '  Done on: ' + r.done_date : '')));
+        c.appendChild(meta);
+        if (r.notes) c.appendChild(el('div', 'Notes: ' + r.notes, 'meta'));
+        var row = el('div', undefined, 'row'); row.style.marginTop = '6px';
+        var sel = document.createElement('select'); sel.style.width = 'auto'; sel.style.padding = '5px';
+        ['Not started','In progress','Done'].forEach(function(s){ var o = el('option', s); o.value = s; sel.appendChild(o); });
+        sel.value = r.status;
+        sel.onchange = async function(){ try { await saveRecord('plan', { id: r.id, status: sel.value }); loadPlan(); } catch(e){ alert(e.message); } };
+        var ed = el('button', 'Edit', 'sec small'); ed.onclick = function(){ editPlan(r, false); };
+        row.appendChild(sel); row.appendChild(ed); c.appendChild(row);
+        host.appendChild(c);
+      });
+    });
+  } catch(e){ fail('planBox', e); }
+}
+function editPlan(r, isNew){
+  var a = isAdmin();
+  openForm({
+    title: isNew ? 'Add task' : 'Edit task', values: r,
+    fields: [
+      { key: 'phase', label: 'Phase', disabled: !a }, { key: 'title', label: 'Task', disabled: !a },
+      { key: 'area', label: 'Saving area', disabled: !a }, { key: 'owner', label: 'Owner' },
+      { key: 'due_date', label: 'Due date (leave empty to use plan start + days)', kind: 'date', disabled: !a },
+      { key: 'due_offset', label: 'Due after how many days from plan start', kind: 'number', disabled: !a },
+      { key: 'status', label: 'Status', kind: 'select', options: ['Not started','In progress','Done'] },
+      { key: 'notes', label: 'Notes', kind: 'textarea' }
+    ],
+    onSave: async function(v){ if (!isNew) v.id = r.id; else v.sort = 999; await saveRecord('plan', v); loadPlan(); },
+    onDelete: !isNew && a ? async function(){ await deleteRecord('plan', r.id); loadPlan(); } : null
+  });
+}
+
+/* ---------- saving areas ---------- */
+async function loadAreas(){
+  var host = $('areasBox'); host.textContent = 'Loading...';
+  try {
+    var rows = (await api('/api/records?type=areas')).rows;
+    host.innerHTML = '';
+    host.appendChild(el('p', 'Each area needs a first check by the owners. Record what you found and what you did.', 'note'));
+    if (isAdmin()) { var add = el('button', 'Add area', 'sec small'); add.onclick = function(){ editArea({ status: 'Not checked' }, true); }; host.appendChild(add); }
+    rows.forEach(function(r){
+      var c = el('div', undefined, 'item s-' + r.status);
+      c.appendChild(el('h4', r.area));
+      c.appendChild(el('div', r.what || '', 'meta'));
+      var meta = el('div', undefined, 'meta');
+      meta.appendChild(pill(r.status, r.status === 'Fixed' ? 'done' : r.status === 'Action in progress' ? 'prog' : r.status === 'Checked' ? '' : 'todo'));
+      meta.appendChild(document.createTextNode((r.cost ? 'Cost to fix: ' + r.cost + '  ' : '') + (r.owner ? 'Owner: ' + r.owner + '  ' : '') + (r.saving_pct !== null ? 'Estimated saving: ' + r.saving_pct + '%' : '')));
+      c.appendChild(meta);
+      if (r.finding) c.appendChild(el('div', 'Found: ' + r.finding, 'meta'));
+      if (r.action) c.appendChild(el('div', 'Action: ' + r.action, 'meta'));
+      var ed = el('button', 'Update', 'sec small'); ed.style.marginTop = '6px'; ed.onclick = function(){ editArea(r, false); };
+      c.appendChild(ed); host.appendChild(c);
+    });
+  } catch(e){ fail('areasBox', e); }
+}
+function editArea(r, isNew){
+  var a = isAdmin();
+  openForm({
+    title: isNew ? 'Add area' : r.area, values: r,
+    fields: [
+      { key: 'area', label: 'Area', disabled: !a }, { key: 'what', label: 'What to check or do', kind: 'textarea', disabled: !a },
+      { key: 'cost', label: 'Cost to fix', disabled: !a },
+      { key: 'status', label: 'Status', kind: 'select', options: ['Not checked','Checked','Action in progress','Fixed'] },
+      { key: 'finding', label: 'What was found', kind: 'textarea' }, { key: 'action', label: 'Action taken or planned', kind: 'textarea' },
+      { key: 'owner', label: 'Owner' }, { key: 'saving_pct', label: 'Estimated saving in this area (%)', kind: 'number', disabled: !a }
+    ],
+    onSave: async function(v){ if (!isNew) v.id = r.id; await saveRecord('areas', v); loadAreas(); },
+    onDelete: !isNew && a ? async function(){ await deleteRecord('areas', r.id); loadAreas(); } : null
+  });
+}
+
+/* ---------- equipment ---------- */
+function est(e){ return (e.qty || 0) * (e.kw || 0) * (e.hours_per_day || 0); }
+async function loadEquipment(){
+  var host = $('equipBox'); host.textContent = 'Loading...';
+  try {
+    var rows = (await api('/api/records?type=equipment')).rows;
+    host.innerHTML = '';
+    var total = rows.reduce(function(a, e){ return a + est(e); }, 0);
+    host.appendChild(el('p', 'List every major machine with its kW rating and daily running hours. Estimated use per day = quantity x kW x hours. Check the kW on the machine label.', 'note'));
+    var cards = el('div', undefined, 'cards'), c = el('div', undefined, 'card');
+    c.appendChild(el('small', 'Estimated total use per day (kWh)')); c.appendChild(el('div', fmt(total), 'v')); cards.appendChild(c);
+    host.appendChild(cards);
+    var add = el('button', 'Add equipment', 'sec small'); add.onclick = function(){ editEquip({ qty: 1 }, true); }; host.appendChild(add);
+    var t = tableOf(['Equipment','Area / zone','Qty','kW each','Hours/day','kWh/day'], 2);
+    rows.forEach(function(e){
+      var tr = addRow(t.tBodies[0], [e.name, [e.area, e.zone].filter(Boolean).join(' / '), e.qty, e.kw === null ? '-' : e.kw, e.hours_per_day === null ? '-' : e.hours_per_day, fmt(est(e))], 2);
+      tr.style.cursor = 'pointer'; tr.onclick = function(){ editEquip(e, false); };
+    });
+    var sc = el('div', undefined, 'scroll'); sc.appendChild(t); host.appendChild(sc);
+    host.appendChild(el('p', 'Tap a row to edit.', 'note'));
+  } catch(e){ fail('equipBox', e); }
+}
+function editEquip(r, isNew){
+  openForm({
+    title: isNew ? 'Add equipment' : 'Edit equipment', values: r,
+    fields: [
+      { key: 'name', label: 'Equipment name' },
+      { key: 'area', label: 'Saving area', kind: 'select', options: ['', 'Air conditioning', 'Lighting', 'Hot water, steam, sauna (spa and wet areas)', 'Cardio equipment and screens', 'Pumps and motors', 'Other'] },
+      { key: 'zone', label: 'Zone or room' },
+      { key: 'qty', label: 'Quantity', kind: 'number' }, { key: 'kw', label: 'kW each', kind: 'number' },
+      { key: 'hours_per_day', label: 'Running hours per day', kind: 'number' }, { key: 'notes', label: 'Notes', kind: 'textarea' }
+    ],
+    onSave: async function(v){ if (!isNew) v.id = r.id; await saveRecord('equipment', v); loadEquipment(); },
+    onDelete: !isNew && isAdmin() ? async function(){ await deleteRecord('equipment', r.id); loadEquipment(); } : null
+  });
+}
+
+/* ---------- dashboard ---------- */
+async function loadDash(){
+  try {
+    var f = new Date(TODAY + 'T00:00:00Z'); f.setUTCDate(f.getUTCDate() - 29);
+    var res = await Promise.all([api('/api/kpi'), api('/api/summary?from=' + f.toISOString().slice(0,10) + '&to=' + TODAY)]);
+    var k = res[0], s = res[1];
+    $('dPeriod').textContent = 'Last 30 days: ' + k.period.from + ' to ' + k.period.to + '. Days with full readings: ' + k.days_with_readings + '.';
+    var cards = $('dCards'); cards.innerHTML = '';
+    function card(label, value, sub){ var c = el('div', undefined, 'card'); c.appendChild(el('small', label)); c.appendChild(el('div', value, 'v')); if (sub) c.appendChild(el('small', sub)); cards.appendChild(c); }
+    card('Average units per day', k.avg_per_day === null ? '-' : fmt(k.avg_per_day));
+    card('Versus baseline', k.vs_baseline_pct === null ? '-' : (k.vs_baseline_pct > 0 ? '+' : '') + k.vs_baseline_pct + '%', k.baseline ? 'Baseline ' + k.baseline + ' per day' : 'Baseline not set (Settings)');
+    card('Units per member visit', k.kwh_per_visit === null ? '-' : fmt(k.kwh_per_visit), k.visit_days + ' days with visits entered');
+    card('Checklist done', k.checklist_avg === null ? '-' : k.checklist_avg + '%');
+    card('Plan tasks done', k.plan.done + ' of ' + k.plan.total, k.plan.overdue.length + ' overdue');
+    var ratio = k.avg_per_day && k.equipment.est_daily_kwh ? Math.round(100 * k.equipment.est_daily_kwh / k.avg_per_day) + '%' : '-';
+    card('Equipment list covers', ratio, 'Listed ' + fmt(k.equipment.est_daily_kwh) + ' kWh/day of ' + (k.avg_per_day === null ? '-' : fmt(k.avg_per_day)) + ' metered');
+    var b0 = k.bills[0];
+    card('Latest bill vs last year', b0 && b0.units_vs_last_year !== null ? (b0.units_vs_last_year > 0 ? '+' : '') + b0.units_vs_last_year + '% units' : '-', b0 ? b0.bill_month.slice(0, 7) : 'No bills entered');
+    card('Waiting for CMD Sir', String(k.pending_approvals), 'approvals pending');
+    drawChart(k.days.slice().reverse(), k.baseline);
+
+    var pl = $('dPlan'); pl.innerHTML = '';
+    k.plan.by_phase.forEach(function(p){ pl.appendChild(el('div', p.phase + ': ' + p.done + ' of ' + p.total)); pl.appendChild(bar(pct(p.done, p.total))); });
+    if (k.plan.overdue.length) {
+      pl.appendChild(el('div', 'Overdue tasks', 'meta'));
+      k.plan.overdue.forEach(function(o){ pl.appendChild(el('div', o.title + ' (due ' + o.due + ', ' + (o.owner || 'no owner') + ')', 'item late')); });
+    }
+    var ar = $('dAreas'); ar.innerHTML = '';
+    Object.keys(k.areas).forEach(function(s2){ ar.appendChild(pill(s2 + ': ' + k.areas[s2], s2 === 'Fixed' ? 'done' : s2 === 'Action in progress' ? 'prog' : '')); });
+
+    var ib = $('dIssues'); ib.innerHTML = '';
+    if (!s.issues.length) ib.appendChild(el('p', 'None in this period.', 'note'));
+    s.issues.forEach(function(i){
+      var box = el('div', undefined, 'item issue' + (i.status === 'Closed' ? ' closed' : ''));
+      box.appendChild(el('div', i.entry_date + ' - ' + (i.area || '') + ' (' + i.entered_by + ')', 'meta'));
+      box.appendChild(el('div', i.issue));
+      var b = el('button', i.status === 'Open' ? 'Mark closed' : 'Reopen', 'sec small'); b.style.marginTop = '6px';
+      b.onclick = async function(){ try { await api('/api/issues', { method: 'PATCH', body: { id: i.id, status: i.status === 'Open' ? 'Closed' : 'Open' } }); loadDash(); } catch(e){ alert(e.message); } };
+      box.appendChild(b); ib.appendChild(box);
+    });
+  } catch(e){ $('dCards').innerHTML = ''; $('dCards').appendChild(el('div', e.message, 'msg bad')); }
+}
+function drawChart(days, base){
+  var host = $('chart'); host.innerHTML = '';
+  var ns = 'http://www.w3.org/2000/svg', W = 640, H = 220, L = 38, B = 28, T = 10, R = 8;
+  var vals = days.map(function(d){ return d.total; });
+  var max = Math.max.apply(null, vals.filter(function(v){ return v !== null; }).concat(base ? [base] : [], [1])) * 1.15;
+  var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.style.width = '100%';
+  function mk(tag, attrs, text){ var e = document.createElementNS(ns, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; svg.appendChild(e); return e; }
+  var ph = H - B - T, pw = W - L - R, bw = pw / days.length;
+  for (var g = 0; g <= 4; g++) {
+    var y = T + ph - (ph * g / 4);
+    mk('line', { x1: L, x2: W - R, y1: y, y2: y, stroke: '#e3e3e3' });
+    mk('text', { x: L - 4, y: y + 4, 'text-anchor': 'end', fill: '#666' }, Math.round(max * g / 4));
+  }
+  days.forEach(function(d, i){
+    var x = L + i * bw;
+    if (d.total !== null && d.total >= 0) {
+      var h = ph * d.total / max;
+      var r = mk('rect', { x: x + bw * 0.12, y: T + ph - h, width: bw * 0.76, height: h, fill: '#0b6b3a' });
+      var tt = document.createElementNS(ns, 'title'); tt.textContent = d.date + ': ' + fmt(d.total) + ' units'; r.appendChild(tt);
+    }
+    if (days.length <= 16 || i % 3 === 0) mk('text', { x: x + bw / 2, y: H - 10, 'text-anchor': 'middle', fill: '#666' }, d.date.slice(8) + '/' + d.date.slice(5, 7));
+  });
+  if (base) {
+    var by = T + ph - ph * base / max;
+    mk('line', { x1: L, x2: W - R, y1: by, y2: by, stroke: '#d98c00', 'stroke-width': 2, 'stroke-dasharray': '6 4' });
+  }
+  host.appendChild(svg);
+}
+
+/* ---------- bills ---------- */
+async function loadBills(){
+  var host = $('billsBox'); host.textContent = 'Loading...';
+  try {
+    var k = await api('/api/kpi'); var rows = k.bills;
+    host.innerHTML = '';
+    host.appendChild(el('p', 'Enter each monthly electricity bill and DG diesel use. The last 13 months show against the same month last year. Check power factor and contract demand for penalties.', 'note'));
+    var add = el('button', 'Add bill', 'sec small'); add.onclick = function(){ editBill({}, true); }; host.appendChild(add);
+    var t = tableOf(['Month','Units','Units vs last year','Amount','Amount vs last year','Power factor','Contract kVA','Diesel (litres)'], 1);
+    var vs = function(v){ return v === null ? '-' : (v > 0 ? '+' : '') + v + '%'; };
+    rows.forEach(function(b){
+      var tr = addRow(t.tBodies[0], [b.bill_month.slice(0, 7), fmt(b.units), vs(b.units_vs_last_year), fmt(b.amount), vs(b.amount_vs_last_year), fmt(b.power_factor), fmt(b.contract_kva), fmt(b.diesel_litres)], 1);
+      tr.style.cursor = 'pointer'; tr.onclick = function(){ editBill(b, false); };
+    });
+    var sc = el('div', undefined, 'scroll'); sc.appendChild(t); host.appendChild(sc);
+    host.appendChild(el('p', 'Tap a row to edit. Adding a month that already exists replaces it.', 'note'));
+  } catch(e){ fail('billsBox', e); }
+}
+function editBill(r, isNew){
+  openForm({
+    title: isNew ? 'Add bill' : 'Edit bill', values: r,
+    fields: [
+      { key: 'bill_month', label: 'Bill month', kind: 'month', disabled: !isNew },
+      { key: 'units', label: 'Units (kWh)', kind: 'number' }, { key: 'amount', label: 'Bill amount', kind: 'number' },
+      { key: 'power_factor', label: 'Power factor', kind: 'number' }, { key: 'contract_kva', label: 'Contract demand (kVA)', kind: 'number' },
+      { key: 'diesel_litres', label: 'DG diesel used (litres)', kind: 'number' }, { key: 'notes', label: 'Notes', kind: 'textarea' }
+    ],
+    onSave: async function(v){ if (!isNew) { v.bill_month = r.bill_month; } await saveRecord('bills', v); loadBills(); },
+    onDelete: !isNew ? async function(){ await deleteRecord('bills', r.id); loadBills(); } : null
+  });
+}
+
+/* ---------- CMD approvals ---------- */
+async function loadApprovals(){
+  var host = $('apprBox'); host.textContent = 'Loading...';
+  try {
+    var rows = (await api('/api/records?type=approvals')).rows;
+    host.innerHTML = '';
+    var pend = rows.filter(function(r){ return r.status === 'Pending'; }).length;
+    host.appendChild(el('h3', 'Approvals from CMD Sir: ' + pend + ' pending of ' + rows.length));
+    var add = el('button', 'Add item', 'sec small'); add.onclick = function(){ editAppr({ status: 'Pending' }, true); }; host.appendChild(add);
+    rows.forEach(function(r){
+      var c = el('div', undefined, 'item s-' + r.status);
+      c.appendChild(el('h4', r.item));
+      var meta = el('div', undefined, 'meta');
+      meta.appendChild(pill(r.status, r.status === 'Approved' ? 'done' : r.status === 'Needs changes' ? 'late' : 'todo'));
+      if (r.decided_on) meta.appendChild(document.createTextNode('Decided on ' + r.decided_on));
+      c.appendChild(meta);
+      if (r.cmd_remark) c.appendChild(el('div', "CMD Sir's remark: " + r.cmd_remark, 'meta'));
+      var ed = el('button', 'Update', 'sec small'); ed.style.marginTop = '6px'; ed.onclick = function(){ editAppr(r, false); };
+      c.appendChild(ed); host.appendChild(c);
+    });
+  } catch(e){ fail('apprBox', e); }
+}
+function editAppr(r, isNew){
+  openForm({
+    title: isNew ? 'Add item' : 'Update approval', values: r,
+    fields: [
+      { key: 'item', label: 'Item for approval', kind: 'textarea' },
+      { key: 'status', label: 'Status', kind: 'select', options: ['Pending','Approved','Needs changes'] },
+      { key: 'cmd_remark', label: "CMD Sir's remark", kind: 'textarea' }, { key: 'decided_on', label: 'Decision date', kind: 'date' }
+    ],
+    onSave: async function(v){ if (!isNew) v.id = r.id; else v.sort = 999; await saveRecord('approvals', v); loadApprovals(); },
+    onDelete: !isNew ? async function(){ await deleteRecord('approvals', r.id); loadApprovals(); } : null
+  });
+}
+
+/* ---------- settings (owners, scorecard, lists) ---------- */
+var SCORES = {};
+async function fillSettings(){
+  $('sMeters').value = CFG.meters.join('\n'); $('sStaff').value = CFG.staff.join('\n'); $('sItems').value = CFG.items.join('\n');
+  $('sBase').value = CFG.baseline_per_day || ''; $('sStart').value = CFG.plan_start || '';
+  [['sOwner', CFG.energy_owner], ['sBackup', CFG.backup_owner]].forEach(function(p){
+    var s = $(p[0]); s.innerHTML = '';
+    var n = el('option', 'Not decided yet'); n.value = ''; s.appendChild(n);
+    CFG.staff.forEach(function(x){ var o = el('option', x); o.value = x; s.appendChild(o); });
+    s.value = p[1] || '';
+  });
+  var box = $('scoreBox'); box.textContent = 'Loading scorecard...';
+  try {
+    var rows = (await api('/api/records?type=scorecard')).rows;
+    SCORES = {}; rows.forEach(function(r){ SCORES[r.criterion + '|' + r.person] = r.score; });
+    box.innerHTML = '';
+    box.appendChild(el('h3', 'Selection scorecard (score 1 to 5)'));
+    var t = tableOf(['Criterion'].concat(CFG.staff), 1), tb = t.tBodies[0];
+    CRITERIA.forEach(function(c){
+      var tr = document.createElement('tr'); tr.appendChild(el('td', c));
+      CFG.staff.forEach(function(p){
+        var td = document.createElement('td'), i = document.createElement('input');
+        i.type = 'number'; i.min = 1; i.max = 5; i.style.width = '70px'; i.setAttribute('data-c', c); i.setAttribute('data-p', p);
+        i.value = SCORES[c + '|' + p] || ''; i.oninput = totals; td.appendChild(i); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    var tot = document.createElement('tr'); tot.id = 'totRow'; tb.appendChild(tot);
+    var sc = el('div', undefined, 'scroll'); sc.appendChild(t); box.appendChild(sc);
+    box.appendChild(el('div', '', 'note')).id = 'lead';
+    totals();
+  } catch(e){ box.textContent = e.message; }
+}
+function totals(){
+  var sums = {}; CFG.staff.forEach(function(p){ sums[p] = 0; });
+  document.querySelectorAll('[data-c]').forEach(function(i){ sums[i.getAttribute('data-p')] += Number(i.value) || 0; });
+  var tr = $('totRow'); if (!tr) return; tr.innerHTML = ''; tr.appendChild(el('td', 'Total')).style.fontWeight = 'bold';
+  var best = -1, who = [];
+  CFG.staff.forEach(function(p){ var td = el('td', String(sums[p])); td.style.fontWeight = 'bold'; tr.appendChild(td); if (sums[p] > best) { best = sums[p]; who = [p]; } else if (sums[p] === best) who.push(p); });
+  $('lead').textContent = best > 0 ? (who.length === 1 ? 'Highest total: ' + who[0] + '. This is a guide; CMD Sir decides who leads.' : 'Totals are equal. CMD Sir decides who leads.') : '';
+}
+async function saveSettings(){
+  var lines = function(id){ return $(id).value.split('\n').map(function(x){ return x.trim(); }).filter(Boolean); };
+  try {
+    var r = await api('/api/config', { method: 'PUT', body: {
+      meters: lines('sMeters'), staff: lines('sStaff'), items: lines('sItems'), baseline_per_day: $('sBase').value,
+      plan_start: $('sStart').value, energy_owner: $('sOwner').value, backup_owner: $('sBackup').value } });
+    CFG = r.config; buildEntryForm();
+    var cells = document.querySelectorAll('[data-c]');
+    for (var n = 0; n < cells.length; n++) {
+      var i = cells[n], c = i.getAttribute('data-c'), p = i.getAttribute('data-p'), v = i.value;
+      if (v !== '' && Number(v) !== SCORES[c + '|' + p] && CFG.staff.indexOf(p) >= 0) await saveRecord('scorecard', { criterion: c, person: p, score: v });
+    }
+    showMsg('sMsg', 'Settings saved.', true);
+    fillSettings();
+  } catch(e){ showMsg('sMsg', e.message, false); }
+}
+
+/* ---------- auto login ---------- */
+(async function(){
+  var p = sget('bz_pin');
+  if (!p) return;
+  PIN = p;
+  try { startApp(await api('/api/config')); } catch(e){ PIN = ''; sdel('bz_pin'); }
+})();
+</script>
+</body>
+</html>
